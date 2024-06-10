@@ -17,6 +17,7 @@
 
 import json
 import os
+import signal
 from types import MethodType
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 
@@ -62,6 +63,9 @@ class PairwiseTrainer(Trainer):
 
             self.accelerator.clip_grad_norm_ = MethodType(clip_grad_norm_old_version, self.accelerator)
             self.add_callback(BAdamCallback)
+
+        # Handle SIGUSR1 signal to save model checkpoint
+        signal.signal(signal.SIGUSR1, self.handle_sigusr1)
 
     def create_optimizer(self) -> "torch.optim.Optimizer":
         if self.optimizer is None:
@@ -118,3 +122,8 @@ class PairwiseTrainer(Trainer):
                 res.append(json.dumps({"chosen": round(float(c_score), 2), "rejected": round(float(r_score), 2)}))
 
             writer.write("\n".join(res))
+
+    def handle_sigusr1(self, signum, frame):
+        print(f"Received signal {signum}, saving model checkpoint on next step finished..")
+        # Make should_save to True for saving checkpoint
+        self.control.should_save = True
