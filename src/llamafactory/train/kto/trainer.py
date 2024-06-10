@@ -30,6 +30,8 @@ from ...extras.constants import IGNORE_INDEX
 from ..callbacks import SaveProcessorCallback
 from ..trainer_utils import create_custom_optimzer, create_custom_scheduler, get_batch_logps
 
+import signal
+
 
 if TYPE_CHECKING:
     import torch.utils.data
@@ -98,6 +100,9 @@ class CustomKTOTrainer(KTOTrainer):
 
             self.accelerator.clip_grad_norm_ = MethodType(clip_grad_norm_old_version, self.accelerator)
             self.add_callback(BAdamCallback)
+
+        # Handle SIGUSR1 signal to save model checkpoint
+        signal.signal(signal.SIGUSR1, self.handle_sigusr1)
 
     def create_optimizer(self) -> "torch.optim.Optimizer":
         if self.optimizer is None:
@@ -221,3 +226,8 @@ class CustomKTOTrainer(KTOTrainer):
         metrics["kl"] = kl.item()
 
         return losses, metrics
+
+    def handle_sigusr1(self, signum, frame):
+        print(f"Received signal {signum}, saving model checkpoint on next step finished..")
+        # Make should_save to True for saving checkpoint
+        self.control.should_save = True

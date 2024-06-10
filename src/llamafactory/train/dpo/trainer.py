@@ -31,6 +31,7 @@ from ...extras.constants import IGNORE_INDEX
 from ..callbacks import PissaConvertCallback, SaveProcessorCallback
 from ..trainer_utils import create_custom_optimzer, create_custom_scheduler, get_batch_logps
 
+import signal
 
 if TYPE_CHECKING:
     from transformers import PreTrainedModel, ProcessorMixin
@@ -98,11 +99,12 @@ class CustomDPOTrainer(DPOTrainer):
         if finetuning_args.pissa_convert:
             self.callback_handler.add_callback(PissaConvertCallback)
 
-        if finetuning_args.use_badam:
+        # Handle SIGUSR1 signal to save model checkpoint
             from badam import BAdamCallback, clip_grad_norm_old_version
 
             self.accelerator.clip_grad_norm_ = MethodType(clip_grad_norm_old_version, self.accelerator)
             self.add_callback(BAdamCallback)
+        signal.signal(signal.SIGUSR1, self.handle_sigusr1)
 
     def create_optimizer(self) -> "torch.optim.Optimizer":
         if self.optimizer is None:
@@ -253,3 +255,8 @@ class CustomDPOTrainer(DPOTrainer):
             metrics["{}odds_ratio_loss".format(prefix)] = ((losses - sft_loss) / self.beta).detach().mean().cpu()
 
         return losses.mean(), metrics
+
+    def handle_sigusr1(self, signum, frame):
+        print(f"Received signal {signum}, saving model checkpoint on next step finished..")
+        # Make should_save to True for saving checkpoint
+        self.control.should_save = True

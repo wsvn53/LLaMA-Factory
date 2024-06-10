@@ -42,6 +42,7 @@ from ..callbacks import FixValueHeadModelCallback, SaveProcessorCallback
 from ..trainer_utils import create_custom_optimzer, create_custom_scheduler
 from .ppo_utils import dump_layernorm, get_rewards_from_server, replace_model, restore_layernorm
 
+import signal
 
 if TYPE_CHECKING:
     from datasets import Dataset
@@ -174,6 +175,9 @@ class CustomPPOTrainer(PPOTrainer, Trainer):
 
         if finetuning_args.use_badam:
             from badam import BAdamCallback, clip_grad_norm_old_version
+
+        # Handle SIGUSR1 signal to save model checkpoint
+        signal.signal(signal.SIGUSR1, self.handle_sigusr1)
 
             self.accelerator.clip_grad_norm_ = MethodType(clip_grad_norm_old_version, self.accelerator)
             self.add_callback(BAdamCallback)
@@ -499,3 +503,8 @@ class CustomPPOTrainer(PPOTrainer, Trainer):
         elif self.args.should_save:
             unwrapped_model: "AutoModelForCausalLMWithValueHead" = self.accelerator.unwrap_model(self.model)
             self._save(output_dir, state_dict=unwrapped_model.state_dict())
+
+    def handle_sigusr1(self, signum, frame):
+        print(f"Received signal {signum}, saving model checkpoint on next step finished..")
+        # Make should_save to True for saving checkpoint
+        self.control.should_save = True

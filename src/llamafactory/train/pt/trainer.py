@@ -21,6 +21,7 @@ from ...extras.logging import get_logger
 from ..callbacks import PissaConvertCallback, SaveProcessorCallback
 from ..trainer_utils import create_custom_optimzer, create_custom_scheduler
 
+import signal
 
 if TYPE_CHECKING:
     import torch
@@ -48,6 +49,9 @@ class CustomTrainer(Trainer):
 
         if finetuning_args.pissa_convert:
             self.add_callback(PissaConvertCallback)
+
+        # Handle SIGUSR1 signal to save model checkpoint
+        signal.signal(signal.SIGUSR1, self.handle_sigusr1)
 
         if finetuning_args.use_badam:
             from badam import BAdamCallback, clip_grad_norm_old_version
