@@ -17,6 +17,7 @@
 
 import json
 import os
+import signal
 from types import MethodType
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
@@ -63,6 +64,9 @@ class CustomSeq2SeqTrainer(Seq2SeqTrainer):
 
             self.accelerator.clip_grad_norm_ = MethodType(clip_grad_norm_old_version, self.accelerator)
             self.add_callback(BAdamCallback)
+
+        # Handle SIGUSR1 signal to save model checkpoint
+        signal.signal(signal.SIGUSR1, self.handle_sigusr1)
 
     def create_optimizer(self) -> "torch.optim.Optimizer":
         if self.optimizer is None:
@@ -148,3 +152,8 @@ class CustomSeq2SeqTrainer(Seq2SeqTrainer):
                 res.append(json.dumps({"prompt": text, "label": label, "predict": pred}, ensure_ascii=False))
 
             writer.write("\n".join(res))
+
+    def handle_sigusr1(self, signum, frame):
+        print(f"Received signal {signum}, saving model checkpoint on next step finished..")
+        # Make should_save to True for saving checkpoint
+        self.control.should_save = True
