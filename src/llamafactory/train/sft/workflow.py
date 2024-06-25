@@ -46,17 +46,6 @@ def run_sft(
     dataset = get_dataset(model_args, data_args, training_args, stage="sft", **tokenizer_module)
     model = load_model(tokenizer, model_args, finetuning_args, training_args.do_train)
 
-    dataset_eval = None
-    if data_args.dataset_eval is not None and data_args.val_size > 0:
-        # can not assign dataset_eval and val_size at the same time
-        print(f"[WARNING] dataset_eval is set, but val_size is also set to {data_args.val_size}. Ignoring val_size.")
-        data_args.val_size = 0
-    if data_args.dataset_eval:
-        # copy data_args to eval_data_args and change 'dataset' to 'dataset_eval'
-        eval_data_args = copy.deepcopy(data_args)
-        eval_data_args.dataset = eval_data_args.dataset_eval
-        dataset_eval = get_dataset(model_args, eval_data_args, training_args, stage="sft", **tokenizer_module)
-
     if training_args.predict_with_generate:
         tokenizer.padding_side = "left"  # use left-padding in generation
 
@@ -77,6 +66,19 @@ def run_sft(
     training_args.generation_num_beams = data_args.eval_num_beams or training_args.generation_num_beams
     training_args.remove_unused_columns = False if model_args.visual_inputs else training_args.remove_unused_columns
 
+    if data_args.dataset_eval is not None and data_args.val_size > 0:
+        # can not assign dataset_eval and val_size at the same time
+        print(f"[WARNING] dataset_eval is set, but val_size is also set to {data_args.val_size}. Ignoring val_size.")
+        data_args.val_size = 0
+    split_datasets = split_dataset(dataset, data_args, training_args)
+
+    if data_args.dataset_eval:
+        # copy data_args to eval_data_args and change 'dataset' to 'dataset_eval'
+        eval_data_args = copy.deepcopy(data_args)
+        eval_data_args.dataset = eval_data_args.dataset_eval
+        dataset_eval = get_dataset(model_args, eval_data_args, training_args, stage="sft", **tokenizer_module)
+        split_datasets["eval_dataset"] = dataset_eval
+
     # Initialize our Trainer
     trainer = CustomSeq2SeqTrainer(
         model=model,
@@ -87,8 +89,7 @@ def run_sft(
         compute_metrics=ComputeMetrics(tokenizer) if training_args.predict_with_generate else compute_accuracy,
         preprocess_logits_for_metrics=None if training_args.predict_with_generate else eval_logit_processor,
         **tokenizer_module,
-        **split_dataset(dataset, data_args, training_args),
-        eval_dataset=dataset_eval,
+        **split_datasets,
     )
 
     # Keyword arguments for `model.generate`
