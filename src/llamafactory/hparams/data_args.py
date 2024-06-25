@@ -33,6 +33,10 @@ class DataArguments:
         default=None,
         metadata={"help": "The name of provided dataset(s) to use. Use commas to separate multiple datasets."},
     )
+    dataset_eval: Optional[str] = field(
+        default=None,
+        metadata={"help": "The name of provided dataset(s) to use for evaluation. Use commas to separate multiple datasets."},
+    )
     dataset_dir: str = field(
         default="data",
         metadata={"help": "Path to the folder containing the datasets."},
