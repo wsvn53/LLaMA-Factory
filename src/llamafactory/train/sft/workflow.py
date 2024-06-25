@@ -54,7 +54,7 @@ def run_sft(
     if data_args.dataset_eval:
         # copy data_args to eval_data_args and change 'dataset' to 'dataset_eval'
         eval_data_args = copy.deepcopy(data_args)
-        eval_data_args.dataset = eval_data_args.dataset
+        eval_data_args.dataset = eval_data_args.dataset_eval
         dataset_eval = get_dataset(model_args, eval_data_args, training_args, stage="sft", **tokenizer_module)
 
     if training_args.predict_with_generate:
